@@ -4,7 +4,7 @@
 デザインを変える前と後、記事を作った後に、見た目を確かめるために使う。
 撮った画像は /tmp/issue-images/screens/ に保存する（Read で開いて見る）。
 
-このサイトはページを開いてから data/*.json を読み込んで中身を表示するので、
+tools/build.py --preview で確認用のサイト（中身を書き込んだページ）を作り、
 手元に小さなWebサーバーを立てて、ブラウザで開いてから撮る。
 
 使い方:
@@ -42,7 +42,9 @@ class QuietHandler(http.server.SimpleHTTPRequestHandler):
 def default_pages() -> list[str]:
     pages = [""]
     try:
-        items = json.loads((DIST / "data" / "news.json").read_text(encoding="utf-8"))["items"]
+        # dist/ には JSON を置かないので、site/ の news.json から探す（確認用に出ている記事だけ）
+        items = json.loads((ROOT / "site" / "data" / "news.json").read_text(encoding="utf-8"))["items"]
+        items = [n for n in items if (DIST / "news" / n["slug"] / "index.html").is_file()]
         newest = sorted(items, key=lambda n: n["d"] + n["slug"], reverse=True)
         if newest:
             pages.append(f"news/{newest[0]['slug']}/")

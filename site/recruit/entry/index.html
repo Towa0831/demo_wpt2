@@ -94,43 +94,12 @@
 </footer>
 <script>
   /* ==========================================================================
-     エントリーフォームで data/recruit.json から表示している部分
-       ご希望の職種の選択肢 … jobs ＋「まだ決めていない」
-     募集一覧などの「応募する」から来たときは、URLの title・job・site をフォームに入れておく
+     募集一覧などの「応募する」から来たときは、URLの title・job・site を
+     エントリーフォーム（Xserverのメールフォーム）に入れておく。
+     この部分は JSON を読まない
      ========================================================================== */
   (() => {
-    const ROOT = '../../';  // このページからサイトのトップまでの相対パス
-
-    // JSONの文字をHTMLとして安全に埋め込むためのエスケープ。br は改行を <br> にする
-    const esc = s => String(s ?? '').replace(/[&<>"']/g, c => (
-      { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
-    ));
-    const br = s => esc(s).replace(/\n/g, '<br>');
-    // JSONの「/」で始まるパス（/assets/… など）を、このページから見たパスに直す
-    const url = p => (String(p ?? '').startsWith('/') ? ROOT + p.slice(1) : p);
-    const img = (src, alt) => `<img src="${esc(url(src))}" alt="${esc(alt)}" loading="lazy">`;
-    // 「確認中」のメモ。todo はページに置いてある <p class="todo"> に入れる、note はHTMLの文字で返す。
-    // どちらも、文字が空なら出さない
-    const todo = (el, text) => { el.innerHTML = `<span>確認中</span>${esc(text)}`; el.hidden = !text; };
-    const note = text => (text ? `<p class="todo"><span>確認中</span>${esc(text)}</p>` : '');
-    const $ = id => document.getElementById(id);
-    const load = name => fetch(`${ROOT}data/${name}`, { cache: 'no-cache' }).then(res => {
-      if (!res.ok) throw new Error(`${name} が読み込めません（${res.status}）`);
-      return res.json();
-    });
-
-    const form = document.querySelector('form.form');
     const params = new URLSearchParams(location.search);
-
-    load('recruit.json').then(rec => {
-      const select = form.elements.job;
-      select.insertAdjacentHTML('beforeend', [...rec.jobs.map(j => j.name), 'まだ決めていない']
-        .map(name => `<option>${esc(name)}</option>`).join(''));
-    }).catch(err => console.error(err)).finally(() => {
-      ['title', 'job', 'site'].forEach(k => {
-        if (params.get(k)) form.elements[k].value = params.get(k);
-      });
-    });
 
     // Xserverのメールフォーム（iframe）に、URLの title・job・site の値を入れる
     const fill = {
@@ -161,8 +130,6 @@
       mailFrame.addEventListener('load', setValues);
       setValues(); // スクリプト実行時点ですでにフォームが読み込まれていた場合
     }
-
-    
   })();
 </script>
 <script src="../../assets/app.js?v=20261028" defer></script>

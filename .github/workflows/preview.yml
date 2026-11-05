@@ -86,3 +86,26 @@ jobs:
           } > comment.md
           gh api "repos/$REPO/issues/$TARGET/comments" -F body=@comment.md > /dev/null
           echo "#$TARGET に確認用ページのURLを知らせました: $PAGE_URL"
+
+      # 確認用ページを作れなかったときも、URLを待っている人に分かるように知らせる
+      - name: 確認用ページを作れなかったことを知らせる
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          BRANCH: ${{ github.ref_name }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          PR="$(gh pr list --repo "$REPO" --head "$BRANCH" --state open --json number --jq '.[0].number // empty')"
+          ISSUE="$(echo "$BRANCH" | sed -nE 's#^claude/issue-([0-9]+)-.*#\1#p')"
+          TARGET="${PR:-$ISSUE}"
+          if [ -z "$TARGET" ]; then exit 0; fi
+          {
+            echo "### 確認用ページを作れませんでした"
+            echo ""
+            echo "保存した内容で、表示できないページがありました（本番サイトは変わっていません）。"
+            echo "\`@claude 確認用ページが作れなかった原因を調べて直して\` とコメントしてください。直らないときは管理者に連絡してください。"
+            echo ""
+            echo "詳しい記録（管理者向け）: ${RUN_URL}"
+          } > comment.md
+          gh api "repos/$REPO/issues/$TARGET/comments" -F body=@comment.md > /dev/null
