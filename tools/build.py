@@ -8,9 +8,12 @@ site/ を dist/ に写し、次のことを行う（site/ の中は書き換え�
   - お知らせ（news.json）の「下書き」「非公開」「公開日が未来」の記事を、本番用からは外す
   - 画像やCSSを差し替えたとき、ブラウザに古いものが残らないよう、?v= の番号を付け直す
   - 確認用（--preview）では、ページの上に黄色い帯を出し、検索エンジンに載らないようにする
-  - ページを一度ブラウザで開いて、JSON から表示された中身をそのまま HTML に書き込む（事前の書き込み）。
+  - ページを一度ブラウザで開いて、JSON から表示された中身をそのまま HTML に書き込み（事前の書き込み）、
+    JSON を読む表示処理（load( を使う <script>）をページから外す。
     検索エンジンやSNSでの共有でも、記事ごとのタイトルや中身が読めるようにするため。
-    見る人の操作で表示が変わるページ（ニュース一覧の絞り込み、エントリーフォーム）は、表示処理を残す
+    ニュース一覧の絞り込み・ページ送りは、JSON を読まない別の <script> にしてあるので、そのまま動く
+  - 全ページの書き込みができたら、dist/ から data/ フォルダを外す（本番・確認用のサーバーに JSON を置かない）。
+    1ページでも書き込めなかったときは、エラーにして止める（JSON がないと表示できないページを公開しないため）
 
 使い方:
   python tools/build.py --check      チェックだけ（ファイルは作らない。今日の日付も表示）
@@ -18,7 +21,7 @@ site/ を dist/ に写し、次のことを行う（site/ の中は書き換え�
   python tools/build.py              本番用を dist/ に作る
   python tools/build.py --weekday 2026-12-29 2027-01-04   曜日を確かめる
   python tools/build.py --today 2026-12-01                 今日の日付を変えて試す
-  python tools/build.py --no-prerender                     事前の書き込みをしない（手元で急いで試すとき）
+  python tools/build.py --no-prerender                     事前の書き込みをしない（手元で急いで試すとき。data/ は残る）
 """
 
 from __future__ import annotations
@@ -386,18 +389,26 @@ DATA_SCRIPT_RE = re.compile(r"<script>(?:(?!</script>).)*?\bload\((?:(?!</script
 
 
 def prerender_mode(text: str) -> str:
-    """そのページの扱い。skip：書き込まない／keep：書き込んで表示処理も残す／strip：書き込んで表示処理を外す"""
+    """そのページの扱い。skip：JSON を読まないので何もしない／strip：書き込んで表示処理を外す／
+    mixed：表示処理の中に、見る人の操作に応える処理が混ざっていて、外すと動かなくなる"""
     scripts = DATA_SCRIPT_RE.findall(text)
     if not scripts:
         return "skip"
     joined = " ".join(scripts)
-    interactive = "addEventListener" in joined or "location.search" in joined
-    appends = re.search(r"insertAdjacentHTML|appendChild|\.append\(|innerHTML\s*\+=", joined)
-    if interactive and appends:
-        return "skip"   # 同じ処理をもう一度動かすと中身が二重になるページ（エントリーフォーム）
-    if interactive:
-        return "keep"   # 絞り込みなど、見る人の操作で表示が変わるページ（ニュース一覧）
+    if "addEventListener" in joined or "location.search" in joined:
+        return "mixed"
     return "strip"
+
+
+def pages_needing_json(pages: list[Path]) -> list[str]:
+    """JSON を読む処理が残っているページ（data/ を外すと表示できなくなるページ）"""
+    left = []
+    for page in pages:
+        text = page.read_text(encoding="utf-8")
+        inline = re.findall(r"<script>(.*?)</script>", text, re.S)
+        if DATA_SCRIPT_RE.search(text) or any("fetch(" in s for s in inline):
+            left.append(page.relative_to(DIST).as_posix())
+    return left
 
 
 class _QuietHandler(http.server.SimpleHTTPRequestHandler):
@@ -442,6 +453,10 @@ def prerender(pages: list[Path]) -> tuple[int, list[str]]:
                 mode = prerender_mode(original)
                 if mode == "skip":
                     continue
+                if mode == "mixed":
+                    problems.append(f"{rel}: JSON を読む <script> の中に、クリックなどに応える処理が混ざっているため、書き込めません"
+                                    "（ニュース一覧のように、操作の部分を JSON を読まない別の <script> に分けてください）")
+                    continue
                 tab = context.new_page()
                 errors: list[str] = []
                 tab.on("pageerror", lambda exc, errors=errors: errors.append(str(exc)))
@@ -457,15 +472,12 @@ def prerender(pages: list[Path]) -> tuple[int, list[str]]:
                     tab.close()
                     continue
                 html_text = tab.evaluate(
-                    r"""(strip) => {
-                        if (strip) {
-                          document.querySelectorAll('script:not([src])').forEach(s => {
-                            if (/\bload\(/.test(s.textContent)) s.remove();
-                          });
-                        }
+                    r"""() => {
+                        document.querySelectorAll('script:not([src])').forEach(s => {
+                          if (/\bload\(/.test(s.textContent)) s.remove();
+                        });
                         return document.documentElement.outerHTML;
-                    }""",
-                    mode == "strip",
+                    }"""
                 )
                 page.write_text("<!DOCTYPE html>\n" + html_text + "\n", encoding="utf-8")
                 done += 1
@@ -509,7 +521,7 @@ def stage(preview: bool, today: dt.date, do_prerender: bool = True) -> dict[str,
     if DIST.exists():
         shutil.rmtree(DIST)
     shutil.copytree(SITE, DIST, ignore=IGNORE)
-    removed: dict[str, list[str]] = {"news": [], "openings": [], "prerendered": [], "problems": []}
+    removed: dict[str, list[str]] = {"news": [], "openings": [], "prerendered": [], "problems": [], "fatal": []}
 
     # お知らせ：本番では下書き・非公開・公開日が未来の記事を外す。確認用では非公開だけ外し、印を付ける
     news_path = DIST / "data" / "news.json"
@@ -555,6 +567,12 @@ def stage(preview: bool, today: dt.date, do_prerender: bool = True) -> dict[str,
         done, problems = prerender(pages)
         removed["prerendered"] = [str(done)]
         removed["problems"] = problems
+        # 本番・確認用のサーバーには JSON を置かない。JSON がないと表示できないページが残っていたら止める
+        left = pages_needing_json(pages)
+        if left:
+            removed["fatal"] = [f"JSON を読む処理が残っているページがあります: {'、'.join(left)}"]
+            return removed
+        shutil.rmtree(DIST / "data", ignore_errors=True)
 
     for page in pages:
         text = add_social_tags(page, page.read_text(encoding="utf-8"))
@@ -605,15 +623,23 @@ def main() -> int:
 
     removed = stage(args.preview, today, not args.no_prerender)
     mode = "確認用" if args.preview else "本番用"
+    if removed["fatal"]:
+        for line in removed["problems"] + removed["fatal"]:
+            print(f"[エラー] {line}")
+        print(f"\n{mode}のファイルを作れませんでした。サーバーに JSON を置かない作りのため、"
+              "すべてのページに中身を書き込めないと止まります（本番サイトは前の状態のまま変わりません）。上の内容を直してください。")
+        return 1
     print(f"{mode}のファイルを dist/ に作りました（基準日: {today.isoformat()}）")
     if removed["news"]:
         print(f"  表示しないお知らせ: {'、'.join(removed['news'])}")
     if removed["openings"]:
         print(f"  表示しない求人: {'、'.join(removed['openings'])}")
     if removed["prerendered"]:
-        print(f"  中身を書き込んだページ: {removed['prerendered'][0]} ページ")
+        print(f"  中身を書き込んだページ: {removed['prerendered'][0]} ページ（data/ の JSON は外しました）")
     for line in removed["problems"]:
         print(f"  [注意] {line}")
+    if args.no_prerender:
+        print("  事前の書き込みをしていないため、data/ を残しました（手元での確認用。このままサーバーには置かない）")
     return 0
 
 

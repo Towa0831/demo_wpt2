@@ -58,7 +58,8 @@
      ニュース一覧で data/news.json から表示している部分
        絞り込みのボタン … companies と categories
        一覧 ……………… items（新しい順）
-       ページ送り ……… 絞り込んだ結果を PER_PAGE 件ずつに分ける
+     絞り込みとページ送りは、下の別の <script> で行う。
+     本番用（tools/build.py が作る dist/）では、この表示の部分は中身を書き込んだうえで外される
      ========================================================================== */
   (() => {
     const ROOT = '../';  // このページからサイトのトップまでの相対パス
@@ -83,6 +84,36 @@
     // 会社・カテゴリのコードを、news.json の companies / categories の表示名にする
     const tags = (codes, names) => codes.map(c => `<span>${esc(names[c] || c)}</span>`).join('');
 
+    load('news.json').then(news => {
+      const buttons = (kind, names) => [['all', 'すべて'], ...Object.entries(names)].map(([value, label]) =>
+        `<button type="button" data-kind="${kind}" data-value="${esc(value)}">${esc(label)}</button>`
+      ).join('');
+      $('filter-co').innerHTML = buttons('co', news.companies);
+      $('filter-ca').innerHTML = buttons('ca', news.categories);
+
+      $('news-list').innerHTML = newest(news.items).map(n =>
+        `<li data-co="${esc(n.co.join(' '))}" data-ca="${esc(n.ca.join(' '))}"><a href="${ROOT}news/${esc(n.slug)}/"><span class="nr-meta"><time>${esc(n.d)}</time>${tags(n.co, news.companies)}${tags(n.ca, news.categories)}</span><span class="nr-title">${esc(n.t)}</span></a></li>`
+      ).join('');
+
+      // 表示が終わったことを、下の絞り込み・ページ送りの部分に知らせる
+      document.dispatchEvent(new Event('news-list-ready'));
+    }).catch(err => console.error(err));
+  })();
+</script>
+<script>
+  /* ==========================================================================
+     ニュース一覧の絞り込みとページ送り（見る人の操作で表示を変える部分）
+       一覧の各行の data-co・data-ca で絞り込み、PER_PAGE 件ずつに分ける
+     この部分は JSON を読まないので、本番でもそのまま動く
+     ========================================================================== */
+  (() => {
+    const esc = s => String(s ?? '').replace(/[&<>"']/g, c => (
+      { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+    ));
+    const $ = id => document.getElementById(id);
+    const list = $('news-list');
+    const pager = $('news-pages');
+
     // 1ページに出す件数
     const PER_PAGE = 10;
 
@@ -99,58 +130,46 @@
       return q.toString() ? `?${q}` : location.pathname;
     };
 
-    load('news.json').then(news => {
-      const buttons = (kind, names) => [['all', 'すべて'], ...Object.entries(names)].map(([value, label]) =>
-        `<button type="button" data-kind="${kind}" data-value="${esc(value)}">${esc(label)}</button>`
-      ).join('');
-      $('filter-co').innerHTML = buttons('co', news.companies);
-      $('filter-ca').innerHTML = buttons('ca', news.categories);
+    // ページ送りの部品。「«」最初　「‹」前　ページ番号（いまのページの前後2つまで）　「›」次　「»」最後
+    const pagerHtml = pages => {
+      const link = (page, label, cls, name) =>
+        `<a class="${cls}" href="${esc(query({ ...state, page }))}" data-page="${page}" aria-label="${name}">${label}</a>`;
+      const from = Math.max(1, Math.min(state.page - 2, pages - 4));
+      const nums = [];
+      for (let p = from; p <= Math.min(pages, from + 4); p++) {
+        nums.push(p === state.page
+          ? `<span class="pg-num is-current" aria-current="page">${p}</span>`
+          : link(p, p, 'pg-num', `${p}ページ目`));
+      }
+      // 行き先がないとき（1ページ目の « ‹、最後のページの › »）も同じ幅の空きを残し、ページ番号の位置を動かさない
+      const blank = cls => `<span class="${cls}" aria-hidden="true"></span>`;
+      const hasPrev = state.page > 1, hasNext = state.page < pages;
+      return `<div class="pg-end pg-end--first">${hasPrev ? link(1, '&laquo;', 'pg-jump', '最初のページ') : blank('pg-jump')}</div>` +
+        `<div class="pg-main">${hasPrev ? link(state.page - 1, '&lsaquo;', 'pg-step', '前のページ') : blank('pg-step')}${nums.join('')}${hasNext ? link(state.page + 1, '&rsaquo;', 'pg-step', '次のページ') : blank('pg-step')}</div>` +
+        `<div class="pg-end pg-end--last">${hasNext ? link(pages, '&raquo;', 'pg-jump', '最後のページ') : blank('pg-jump')}</div>`;
+    };
 
-      const list = $('news-list');
-      list.innerHTML = newest(news.items).map(n =>
-        `<li data-co="${esc(n.co.join(' '))}" data-ca="${esc(n.ca.join(' '))}"><a href="${ROOT}news/${esc(n.slug)}/"><span class="nr-meta"><time>${esc(n.d)}</time>${tags(n.co, news.companies)}${tags(n.ca, news.categories)}</span><span class="nr-title">${esc(n.t)}</span></a></li>`
-      ).join('');
+    // 絞り込み → ページ分け。会社・カテゴリが複数ついた記事は、どれか1つが合えば出す
+    const apply = () => {
+      const hits = [...list.querySelectorAll('li')].filter(li => {
+        const ok = kind => state[kind] === 'all' || li.dataset[kind].split(' ').includes(state[kind]);
+        return ok('co') && ok('ca');
+      });
+      const pages = Math.max(1, Math.ceil(hits.length / PER_PAGE));
+      state.page = Math.min(Math.max(1, state.page), pages);
+      const shown = hits.slice((state.page - 1) * PER_PAGE, state.page * PER_PAGE);
+      list.querySelectorAll('li').forEach(li => { li.hidden = !shown.includes(li); });
 
-      // ページ送りの部品。「«」最初　「‹」前　ページ番号（いまのページの前後2つまで）　「›」次　「»」最後
-      const pager = $('news-pages');
-      const pagerHtml = pages => {
-        const link = (page, label, cls, name) =>
-          `<a class="${cls}" href="${esc(query({ ...state, page }))}" data-page="${page}" aria-label="${name}">${label}</a>`;
-        const from = Math.max(1, Math.min(state.page - 2, pages - 4));
-        const nums = [];
-        for (let p = from; p <= Math.min(pages, from + 4); p++) {
-          nums.push(p === state.page
-            ? `<span class="pg-num is-current" aria-current="page">${p}</span>`
-            : link(p, p, 'pg-num', `${p}ページ目`));
-        }
-        // 行き先がないとき（1ページ目の « ‹、最後のページの › »）も同じ幅の空きを残し、ページ番号の位置を動かさない
-        const blank = cls => `<span class="${cls}" aria-hidden="true"></span>`;
-        const hasPrev = state.page > 1, hasNext = state.page < pages;
-        return `<div class="pg-end pg-end--first">${hasPrev ? link(1, '&laquo;', 'pg-jump', '最初のページ') : blank('pg-jump')}</div>` +
-          `<div class="pg-main">${hasPrev ? link(state.page - 1, '&lsaquo;', 'pg-step', '前のページ') : blank('pg-step')}${nums.join('')}${hasNext ? link(state.page + 1, '&rsaquo;', 'pg-step', '次のページ') : blank('pg-step')}</div>` +
-          `<div class="pg-end pg-end--last">${hasNext ? link(pages, '&raquo;', 'pg-jump', '最後のページ') : blank('pg-jump')}</div>`;
-      };
+      document.querySelectorAll('.filter button').forEach(b => {
+        b.setAttribute('aria-pressed', String(state[b.dataset.kind] === b.dataset.value));
+      });
+      pager.innerHTML = pagerHtml(pages);
+      pager.hidden = pages < 2;
 
-      // 絞り込み → ページ分け。会社・カテゴリが複数ついた記事は、どれか1つが合えば出す
-      const apply = () => {
-        const hits = [...list.querySelectorAll('li')].filter(li => {
-          const ok = kind => state[kind] === 'all' || li.dataset[kind].split(' ').includes(state[kind]);
-          return ok('co') && ok('ca');
-        });
-        const pages = Math.max(1, Math.ceil(hits.length / PER_PAGE));
-        state.page = Math.min(Math.max(1, state.page), pages);
-        const shown = hits.slice((state.page - 1) * PER_PAGE, state.page * PER_PAGE);
-        list.querySelectorAll('li').forEach(li => { li.hidden = !shown.includes(li); });
+      history.replaceState(null, '', query(state));
+    };
 
-        document.querySelectorAll('.filter button').forEach(b => {
-          b.setAttribute('aria-pressed', String(state[b.dataset.kind] === b.dataset.value));
-        });
-        pager.innerHTML = pagerHtml(pages);
-        pager.hidden = pages < 2;
-
-        history.replaceState(null, '', query(state));
-      };
-
+    const start = () => {
       // 絞り込みを変えたら、1ページ目に戻る
       document.querySelectorAll('.filter').forEach(f => f.addEventListener('click', ev => {
         const b = ev.target.closest('button');
@@ -170,7 +189,11 @@
         if (list.getBoundingClientRect().top < 0) list.scrollIntoView();
       });
       apply();
-    }).catch(err => console.error(err));
+    };
+
+    // 一覧がすでにページに書かれていれば（本番）すぐ動かす。まだなら（site/ のまま開いたとき）表示が終わるのを待つ
+    if ($('filter-co').querySelector('button')) start();
+    else document.addEventListener('news-list-ready', start, { once: true });
   })();
 </script>
 <script src="../assets/app.js?v=20261028" defer></script>
