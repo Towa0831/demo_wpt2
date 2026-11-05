@@ -2,12 +2,15 @@
 """サイトのチェックと、アップロード用のフォルダ（dist/）づくり。
 
 このサイトは、ページのHTML（site/ の中）が data/*.json を読み込んで中身を表示する作りになっている。
-このプログラムは HTML を作り直さない。site/ をそのまま dist/ に写し、次のことだけを行う。
+site/ を dist/ に写し、次のことを行う（site/ の中は書き換えない）。
 
   - data/*.json の書き方の誤り、記事フォルダや画像の見落としをチェックする
   - お知らせ（news.json）の「下書き」「非公開」「公開日が未来」の記事を、本番用からは外す
   - 画像やCSSを差し替えたとき、ブラウザに古いものが残らないよう、?v= の番号を付け直す
   - 確認用（--preview）では、ページの上に黄色い帯を出し、検索エンジンに載らないようにする
+  - ページを一度ブラウザで開いて、JSON から表示された中身をそのまま HTML に書き込む（事前の書き込み）。
+    検索エンジンやSNSでの共有でも、記事ごとのタイトルや中身が読めるようにするため。
+    見る人の操作で表示が変わるページ（ニュース一覧の絞り込み、エントリーフォーム）は、表示処理を残す
 
 使い方:
   python tools/build.py --check      チェックだけ（ファイルは作らない。今日の日付も表示）
@@ -15,12 +18,16 @@
   python tools/build.py              本番用を dist/ に作る
   python tools/build.py --weekday 2026-12-29 2027-01-04   曜日を確かめる
   python tools/build.py --today 2026-12-01                 今日の日付を変えて試す
+  python tools/build.py --no-prerender                     事前の書き込みをしない（手元で急いで試すとき）
 """
 
 from __future__ import annotations
 
 import argparse
 import datetime as dt
+import functools
+import http.server
+import threading
 import hashlib
 import json
 import re
@@ -35,6 +42,8 @@ SITE = ROOT / "site"
 DATA = SITE / "data"
 DIST = ROOT / "dist"
 JST = ZoneInfo("Asia/Tokyo")
+SITE_URL = "https://yamaguchi-index.com/demo_wpt2/"  # 本番サイトのURL（SNS用の情報に使う）
+DEFAULT_OG_IMAGE = "assets/img/photo/top-hero.jpg"   # 記事に画像がないときに、SNSで共有されたときに出る画像
 WEEKDAYS = "月火水木金土日"
 
 IGNORE = shutil.ignore_patterns("*.md", ".DS_Store", ".gitkeep", "Thumbs.db")
@@ -373,11 +382,134 @@ def refresh_versions(page: Path, text: str) -> str:
     return VERSIONED_RE.sub(fix, text)
 
 
-def stage(preview: bool, today: dt.date) -> dict[str, list[str]]:
+DATA_SCRIPT_RE = re.compile(r"<script>(?:(?!</script>).)*?\bload\((?:(?!</script>).)*?</script>", re.S)
+
+
+def prerender_mode(text: str) -> str:
+    """そのページの扱い。skip：書き込まない／keep：書き込んで表示処理も残す／strip：書き込んで表示処理を外す"""
+    scripts = DATA_SCRIPT_RE.findall(text)
+    if not scripts:
+        return "skip"
+    joined = " ".join(scripts)
+    interactive = "addEventListener" in joined or "location.search" in joined
+    appends = re.search(r"insertAdjacentHTML|appendChild|\.append\(|innerHTML\s*\+=", joined)
+    if interactive and appends:
+        return "skip"   # 同じ処理をもう一度動かすと中身が二重になるページ（エントリーフォーム）
+    if interactive:
+        return "keep"   # 絞り込みなど、見る人の操作で表示が変わるページ（ニュース一覧）
+    return "strip"
+
+
+class _QuietHandler(http.server.SimpleHTTPRequestHandler):
+    def log_message(self, *args) -> None:
+        pass
+
+
+def _launch(playwright):
+    errors = []
+    for options in ({"channel": "chrome"}, {}):
+        try:
+            return playwright.chromium.launch(**options)
+        except Exception as exc:  # noqa: BLE001
+            errors.append(str(exc).splitlines()[0])
+    raise RuntimeError(" / ".join(errors))
+
+
+def prerender(pages: list[Path]) -> tuple[int, list[str]]:
+    """dist/ のページをブラウザで開き、表示された中身を HTML に書き込む。書き込んだページ数と、問題の一覧を返す。"""
+    try:
+        from playwright.sync_api import sync_playwright
+    except ImportError:
+        return 0, ["ブラウザを動かす部品（playwright）がないため、事前の書き込みをしませんでした（ページはこれまでどおり表示されます）。"]
+
+    handler = functools.partial(_QuietHandler, directory=str(DIST))
+    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), handler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    base = f"http://127.0.0.1:{server.server_address[1]}/"
+    done, problems = 0, []
+    try:
+        with sync_playwright() as p:
+            try:
+                browser = _launch(p)
+            except RuntimeError as exc:
+                return 0, [f"ブラウザを起動できなかったため、事前の書き込みをしませんでした（{exc}）。"]
+            context = browser.new_context(viewport={"width": 1280, "height": 900})
+            # フォント・外部のページなど、サイトの外への読み込みは待たない
+            context.route(re.compile(r"^(?!http://127\.0\.0\.1).*"), lambda route: route.abort())
+            for page in pages:
+                rel = page.relative_to(DIST).as_posix()
+                original = page.read_text(encoding="utf-8")
+                mode = prerender_mode(original)
+                if mode == "skip":
+                    continue
+                tab = context.new_page()
+                errors: list[str] = []
+                tab.on("pageerror", lambda exc, errors=errors: errors.append(str(exc)))
+                tab.on("console", lambda msg, errors=errors: errors.append(msg.text) if msg.type == "error" and "net::" not in msg.text and "Failed to load resource" not in msg.text else None)
+                try:
+                    tab.goto(base + rel, wait_until="load", timeout=20000)
+                    tab.wait_for_load_state("networkidle", timeout=10000)
+                    tab.wait_for_timeout(200)
+                except Exception as exc:  # noqa: BLE001
+                    errors.append(str(exc).splitlines()[0])
+                if errors:
+                    problems.append(f"{rel}: 表示の途中で問題があったため、書き込まずに元のままにしました（{errors[0][:100]}）")
+                    tab.close()
+                    continue
+                html_text = tab.evaluate(
+                    r"""(strip) => {
+                        if (strip) {
+                          document.querySelectorAll('script:not([src])').forEach(s => {
+                            if (/\bload\(/.test(s.textContent)) s.remove();
+                          });
+                        }
+                        return document.documentElement.outerHTML;
+                    }""",
+                    mode == "strip",
+                )
+                page.write_text("<!DOCTYPE html>\n" + html_text + "\n", encoding="utf-8")
+                done += 1
+                tab.close()
+            browser.close()
+    finally:
+        server.shutdown()
+    return done, problems
+
+
+def add_social_tags(page: Path, text: str) -> str:
+    """SNSで共有されたときに出る情報（タイトル、説明、画像、URL）を、ページごとに書き込む。"""
+    if 'property="og:title"' in text:
+        return text
+    rel = page.relative_to(DIST).as_posix()
+    path = rel[: -len("index.html")] if rel.endswith("index.html") else rel
+    title_m = re.search(r"<title>(.*?)</title>", text, re.S)
+    desc_m = re.search(r'<meta name="description" content="([^"]*)"', text)
+    title = title_m.group(1).strip() if title_m else ""
+    desc = desc_m.group(1) if desc_m else ""
+    image = DEFAULT_OG_IMAGE
+    is_article = path.startswith("news/") and path != "news/"
+    if is_article:
+        body = text[text.find('id="ar-body"'):] if 'id="ar-body"' in text else ""
+        m = re.search(r'<img[^>]+src="([^"]+)"', body)
+        if m:
+            image = (page.parent / m.group(1).split("?")[0]).resolve().relative_to(DIST.resolve()).as_posix()
+    tags = [
+        f'<meta property="og:type" content="{"article" if is_article else "website"}">',
+        f'<meta property="og:title" content="{title}">',
+        f'<meta property="og:description" content="{desc}">',
+        f'<meta property="og:url" content="{SITE_URL}{path}">',
+        f'<meta property="og:image" content="{SITE_URL}{image}">',
+        '<meta property="og:site_name" content="ウッドプラスチックテクノロジーポータル">',
+        '<meta name="twitter:card" content="summary_large_image">',
+    ]
+    return text.replace("</head>", "\n".join(tags) + "\n</head>", 1)
+
+
+def stage(preview: bool, today: dt.date, do_prerender: bool = True) -> dict[str, list[str]]:
     if DIST.exists():
         shutil.rmtree(DIST)
     shutil.copytree(SITE, DIST, ignore=IGNORE)
-    removed: dict[str, list[str]] = {"news": [], "openings": []}
+    removed: dict[str, list[str]] = {"news": [], "openings": [], "prerendered": [], "problems": []}
 
     # お知らせ：本番では下書き・非公開・公開日が未来の記事を外す。確認用では非公開だけ外し、印を付ける
     news_path = DIST / "data" / "news.json"
@@ -416,8 +548,16 @@ def stage(preview: bool, today: dt.date) -> dict[str, list[str]]:
         recruit["openings"] = openings
         recruit_path.write_text(json.dumps(recruit, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
-    for page in DIST.rglob("*.html"):
-        text = refresh_versions(page, page.read_text(encoding="utf-8"))
+    pages = sorted(DIST.rglob("*.html"))
+    for page in pages:
+        page.write_text(refresh_versions(page, page.read_text(encoding="utf-8")), encoding="utf-8")
+    if do_prerender:
+        done, problems = prerender(pages)
+        removed["prerendered"] = [str(done)]
+        removed["problems"] = problems
+
+    for page in pages:
+        text = add_social_tags(page, page.read_text(encoding="utf-8"))
         if preview:
             text = re.sub(r"(<body[^>]*>)", lambda m: m.group(1) + PREVIEW_BAR, text, count=1)
             text = re.sub(r'<iframe id="mailform"[^>]*></iframe>', FORM_NOTE, text)
@@ -435,6 +575,7 @@ def main() -> int:
     parser.add_argument("--preview", action="store_true", help="確認用として作る")
     parser.add_argument("--today", help="今日の日付を変えて試す（例: 2026-12-01）")
     parser.add_argument("--weekday", nargs="+", metavar="DATE", help="日付の曜日を表示する（例: 2026-12-29）")
+    parser.add_argument("--no-prerender", action="store_true", help="事前の書き込みをしない")
     args = parser.parse_args()
 
     if args.weekday:
@@ -462,13 +603,17 @@ def main() -> int:
         print("チェックOK（エラーはありません）")
         return 0
 
-    removed = stage(args.preview, today)
+    removed = stage(args.preview, today, not args.no_prerender)
     mode = "確認用" if args.preview else "本番用"
     print(f"{mode}のファイルを dist/ に作りました（基準日: {today.isoformat()}）")
     if removed["news"]:
         print(f"  表示しないお知らせ: {'、'.join(removed['news'])}")
     if removed["openings"]:
         print(f"  表示しない求人: {'、'.join(removed['openings'])}")
+    if removed["prerendered"]:
+        print(f"  中身を書き込んだページ: {removed['prerendered'][0]} ページ")
+    for line in removed["problems"]:
+        print(f"  [注意] {line}")
     return 0
 
 
