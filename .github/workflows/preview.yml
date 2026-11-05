@@ -1,0 +1,88 @@
+name: 確認用ページを更新
+
+# Claudeが下書きを保存したら、Claudeの処理（claude.yml）から呼び出されます。
+# 下書きの内容で確認用ページを作って GitHub Pages に公開し、
+# そのURLをIssue（公開申請があればそちら）にコメントします。
+# 確認用ページは1つだけです。最後に作った下書きの内容が表示されます。
+# Actions タブの「Run workflow」で、下書き（ブランチ）を選んで手動でも動かせます。
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+  issues: write
+  pull-requests: write
+
+concurrency:
+  group: preview
+  cancel-in-progress: false
+
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: リポジトリのファイルを取り出す
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Pythonを準備する
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: 必要な部品をインストールする
+        run: pip install -r requirements.txt
+
+      - name: 確認用のファイルをそろえる（チェックも行う）
+        run: python tools/build.py --preview
+
+      - name: 確認用ページを準備する
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist/
+
+      - name: 確認用ページを公開する（GitHub Pages）
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+      - name: 確認用ページのURLを知らせる
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          BRANCH: ${{ github.ref_name }}
+          PAGE_URL: ${{ steps.deployment.outputs.page_url }}
+        run: |
+          set -euo pipefail
+          PAGE_URL="${PAGE_URL%/}/"
+
+          # 知らせる先：この下書きの公開申請があればそこ、なければ元のIssue
+          PR="$(gh pr list --repo "$REPO" --head "$BRANCH" --state open --json number --jq '.[0].number // empty')"
+          ISSUE="$(echo "$BRANCH" | sed -nE 's#^claude/issue-([0-9]+)-.*#\1#p')"
+          TARGET="${PR:-$ISSUE}"
+          if [ -z "$TARGET" ]; then
+            echo "知らせる先が見つからないため、コメントはしません。確認用ページ: $PAGE_URL"
+            exit 0
+          fi
+
+          # 変わったページの一覧（非公開にしたものは、表示されないことを書く）
+          git fetch --quiet origin main
+          PAGES="$(python tools/changed_pages.py origin/main "$PAGE_URL" dist)"
+
+          {
+            echo "### 確認用ページを更新しました"
+            echo ""
+            echo "- トップページ: ${PAGE_URL}"
+            if [ -n "$PAGES" ]; then echo ""; echo "**今回変わったページ**"; echo "$PAGES"; fi
+            echo ""
+            echo "表示が変わっていなければ、ページを再読み込みしてください（反映に1分ほどかかることがあります）。"
+            echo "確認用ページは1つだけなので、ほかの下書きを保存すると、その内容に置き換わります。"
+          } > comment.md
+          gh api "repos/$REPO/issues/$TARGET/comments" -F body=@comment.md > /dev/null
+          echo "#$TARGET に確認用ページのURLを知らせました: $PAGE_URL"

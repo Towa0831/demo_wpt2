@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>ニュース｜ウッドプラスチックテクノロジーポータル</title>
+<meta name="description" content="ウッドプラスチックテクノロジー・アライアンス各社のニュース。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/style.css?v=20261029">
+</head>
+<body>
+<header class="site-header">
+  <div class="hd-inner">
+    <p class="brand"><a href="../">
+      <span class="brand-cap">アライアンス5社をつなぐポータルサイト</span>
+      <span class="brand-row"><svg class="badge" viewBox="0 0 64 40" aria-hidden="true"><ellipse cx="32" cy="20" rx="31" ry="19" fill="var(--green)"/><ellipse cx="32" cy="20" rx="27" ry="15.5" fill="none" stroke="#fff" stroke-width="1.6"/><text x="32" y="26.5" text-anchor="middle" font-size="17" font-weight="800" font-family="Inter,Arial,sans-serif" fill="#fff" font-style="italic">WPT</text></svg><span class="brand-name">ウッドプラスチックテクノロジー</span><span class="brand-sep"></span><span class="brand-portal">PORTAL</span></span>
+    </a></p>
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="gnav"><span></span><span class="sr">メニュー</span></button>
+    <div class="hd-nav" id="gnav">
+      <nav aria-label="メインメニュー"><ul class="gnav"><li><a href="../alliance/">アライアンス</a></li><li><a href="../news/" aria-current="page">ニュース</a></li><li><a href="../contact/">お問い合わせ</a></li></ul></nav>
+      <div class="hd-cta has-drop">
+        <a href="../recruit/" aria-haspopup="true">採用情報</a>
+        <ul class="drop"><li><a href="../recruit/jobs/">仕事を知る</a></li><li><a href="../recruit/people/">人を知る</a></li><li><a href="../recruit/open/">オープン採用</a></li><li><a href="../recruit/faq/">よくある質問</a></li><li><a href="../recruit/career/">募集一覧</a></li><li><a href="../recruit/entry/">エントリー</a></li></ul>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main class="site-main">
+<section class="page-head"><div class="container"><p class="en">NEWS</p><h1>ニュース</h1><p class="ph-lead">アライアンス各社からのお知らせを、ひとつにまとめています。</p></div></section>
+
+<section class="sec narrow"><div class="container"><div class="filters"><p>会社</p><div class="filter" id="filter-co"></div><p>カテゴリ</p><div class="filter" id="filter-ca"></div></div><ul class="news-rows" id="news-list"><!-- news.json の items（新しい順） --></ul><nav class="pagination" id="news-pages" aria-label="ニュースのページ送り" hidden></nav></div></section>
+</main>
+
+<footer class="site-footer">
+  <div class="marquee marquee--footer" aria-hidden="true"><div class="marquee-track"><span>WOOD PLASTIC TECHNOLOGY</span><span>WOOD PLASTIC TECHNOLOGY</span></div></div>
+  <div class="container ft-inner">
+    <div class="brand"><a href="../">
+      <span class="brand-cap">アライアンス5社をつなぐポータルサイト</span>
+      <span class="brand-row"><svg class="badge" viewBox="0 0 64 40" aria-hidden="true"><ellipse cx="32" cy="20" rx="31" ry="19" fill="var(--green)"/><ellipse cx="32" cy="20" rx="27" ry="15.5" fill="none" stroke="#fff" stroke-width="1.6"/><text x="32" y="26.5" text-anchor="middle" font-size="17" font-weight="800" font-family="Inter,Arial,sans-serif" fill="#fff" font-style="italic">WPT</text></svg><span class="brand-name">ウッドプラスチックテクノロジー</span><span class="brand-sep"></span><span class="brand-portal">PORTAL</span></span>
+    </a></div>
+    <ul class="ft-links"><li><a href="../">ホーム</a></li><li><a href="../alliance/">アライアンス</a></li><li><a href="../news/">ニュース</a></li><li><a href="../contact/">お問い合わせ</a></li></ul>
+    <ul class="ft-links"><li><a href="../recruit/">採用トップ</a></li><li><a href="../recruit/jobs/">仕事を知る</a></li><li><a href="../recruit/people/">人を知る</a></li><li><a href="../recruit/open/">オープン採用</a></li><li><a href="../recruit/faq/">よくある質問</a></li><li><a href="../recruit/career/">募集一覧</a></li><li><a href="../recruit/entry/">エントリー</a></li></ul>
+    <div class="ft-bottom">
+      <p class="ft-rel"><span>関連サイト</span>
+        <a href="https://www.wpt.co.jp/">ウッドプラスチックテクノロジー</a>
+        <a href="https://grpla.co.jp/">グリーンプラ</a>
+        <a href="https://shikiita.net/">敷板ネット</a></p>
+      <p class="ft-copy">&copy; Wood Plastic Technology Co., Ltd.</p>
+    </div>
+  </div>
+</footer>
+<script>
+  /* ==========================================================================
+     ニュース一覧で data/news.json から表示している部分
+       絞り込みのボタン … companies と categories
+       一覧 ……………… items（新しい順）
+       ページ送り ……… 絞り込んだ結果を PER_PAGE 件ずつに分ける
+     ========================================================================== */
+  (() => {
+    const ROOT = '../';  // このページからサイトのトップまでの相対パス
+
+    // JSONの文字をHTMLとして安全に埋め込むためのエスケープ。br は改行を <br> にする
+    const esc = s => String(s ?? '').replace(/[&<>"']/g, c => (
+      { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+    ));
+    const br = s => esc(s).replace(/\n/g, '<br>');
+    // JSONの「/」で始まるパス（/assets/… など）を、このページから見たパスに直す
+    const url = p => (String(p ?? '').startsWith('/') ? ROOT + p.slice(1) : p);
+    const img = (src, alt) => `<img src="${esc(url(src))}" alt="${esc(alt)}" loading="lazy">`;
+    // 「確認中」のメモ。文字が空なら隠す
+    const todo = (el, text) => { el.innerHTML = `<span>確認中</span>${esc(text)}`; el.hidden = !text; };
+    const $ = id => document.getElementById(id);
+    const load = name => fetch(`${ROOT}data/${name}`, { cache: 'no-cache' }).then(res => {
+      if (!res.ok) throw new Error(`${name} が読み込めません（${res.status}）`);
+      return res.json();
+    });
+    // ニュースを新しい順に並べる（同じ日付ならフォルダ名の大きい順）
+    const newest = items => [...items].sort((a, b) => (b.d + b.slug).localeCompare(a.d + a.slug));
+    // 会社・カテゴリのコードを、news.json の companies / categories の表示名にする
+    const tags = (codes, names) => codes.map(c => `<span>${esc(names[c] || c)}</span>`).join('');
+
+    // 1ページに出す件数
+    const PER_PAGE = 10;
+
+    // URLに絞り込みやページが入っていれば、それを反映して開く（例：?co=wpt&ca=event&page=2）
+    const params = new URLSearchParams(location.search);
+    const state = { co: params.get('co') || 'all', ca: params.get('ca') || 'all', page: parseInt(params.get('page'), 10) || 1 };
+
+    // 絞り込みとページを、URLの ? 以降の形にする。メールでリンクを送れば同じ状態で開けるようにするため
+    const query = s => {
+      const q = new URLSearchParams();
+      if (s.co !== 'all') q.set('co', s.co);
+      if (s.ca !== 'all') q.set('ca', s.ca);
+      if (s.page > 1) q.set('page', s.page);
+      return q.toString() ? `?${q}` : location.pathname;
+    };
+
+    load('news.json').then(news => {
+      const buttons = (kind, names) => [['all', 'すべて'], ...Object.entries(names)].map(([value, label]) =>
+        `<button type="button" data-kind="${kind}" data-value="${esc(value)}">${esc(label)}</button>`
+      ).join('');
+      $('filter-co').innerHTML = buttons('co', news.companies);
+      $('filter-ca').innerHTML = buttons('ca', news.categories);
+
+      const list = $('news-list');
+      list.innerHTML = newest(news.items).map(n =>
+        `<li data-co="${esc(n.co.join(' '))}" data-ca="${esc(n.ca.join(' '))}"><a href="${ROOT}news/${esc(n.slug)}/"><span class="nr-meta"><time>${esc(n.d)}</time>${tags(n.co, news.companies)}${tags(n.ca, news.categories)}</span><span class="nr-title">${esc(n.t)}</span></a></li>`
+      ).join('');
+
+      // ページ送りの部品。「«」最初　「‹」前　ページ番号（いまのページの前後2つまで）　「›」次　「»」最後
+      const pager = $('news-pages');
+      const pagerHtml = pages => {
+        const link = (page, label, cls, name) =>
+          `<a class="${cls}" href="${esc(query({ ...state, page }))}" data-page="${page}" aria-label="${name}">${label}</a>`;
+        const from = Math.max(1, Math.min(state.page - 2, pages - 4));
+        const nums = [];
+        for (let p = from; p <= Math.min(pages, from + 4); p++) {
+          nums.push(p === state.page
+            ? `<span class="pg-num is-current" aria-current="page">${p}</span>`
+            : link(p, p, 'pg-num', `${p}ページ目`));
+        }
+        // 行き先がないとき（1ページ目の « ‹、最後のページの › »）も同じ幅の空きを残し、ページ番号の位置を動かさない
+        const blank = cls => `<span class="${cls}" aria-hidden="true"></span>`;
+        const hasPrev = state.page > 1, hasNext = state.page < pages;
+        return `<div class="pg-end pg-end--first">${hasPrev ? link(1, '&laquo;', 'pg-jump', '最初のページ') : blank('pg-jump')}</div>` +
+          `<div class="pg-main">${hasPrev ? link(state.page - 1, '&lsaquo;', 'pg-step', '前のページ') : blank('pg-step')}${nums.join('')}${hasNext ? link(state.page + 1, '&rsaquo;', 'pg-step', '次のページ') : blank('pg-step')}</div>` +
+          `<div class="pg-end pg-end--last">${hasNext ? link(pages, '&raquo;', 'pg-jump', '最後のページ') : blank('pg-jump')}</div>`;
+      };
+
+      // 絞り込み → ページ分け。会社・カテゴリが複数ついた記事は、どれか1つが合えば出す
+      const apply = () => {
+        const hits = [...list.querySelectorAll('li')].filter(li => {
+          const ok = kind => state[kind] === 'all' || li.dataset[kind].split(' ').includes(state[kind]);
+          return ok('co') && ok('ca');
+        });
+        const pages = Math.max(1, Math.ceil(hits.length / PER_PAGE));
+        state.page = Math.min(Math.max(1, state.page), pages);
+        const shown = hits.slice((state.page - 1) * PER_PAGE, state.page * PER_PAGE);
+        list.querySelectorAll('li').forEach(li => { li.hidden = !shown.includes(li); });
+
+        document.querySelectorAll('.filter button').forEach(b => {
+          b.setAttribute('aria-pressed', String(state[b.dataset.kind] === b.dataset.value));
+        });
+        pager.innerHTML = pagerHtml(pages);
+        pager.hidden = pages < 2;
+
+        history.replaceState(null, '', query(state));
+      };
+
+      // 絞り込みを変えたら、1ページ目に戻る
+      document.querySelectorAll('.filter').forEach(f => f.addEventListener('click', ev => {
+        const b = ev.target.closest('button');
+        if (!b) return;
+        state[b.dataset.kind] = b.dataset.value;
+        state.page = 1;
+        apply();
+      }));
+
+      // ページを移ったら、一覧の先頭が見えるところまで戻す
+      pager.addEventListener('click', ev => {
+        const a = ev.target.closest('a[data-page]');
+        if (!a) return;
+        ev.preventDefault();
+        state.page = Number(a.dataset.page);
+        apply();
+        if (list.getBoundingClientRect().top < 0) list.scrollIntoView();
+      });
+      apply();
+    }).catch(err => console.error(err));
+  })();
+</script>
+<script src="../assets/app.js?v=20261028" defer></script>
+</body>
+</html>
