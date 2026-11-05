@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>ニュース｜ウッドプラスチックテクノロジーポータル</title>
+<meta name="description" content="ウッドプラスチックテクノロジー・アライアンス各社のニュース。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../assets/style.css?v=20261029">
+</head>
+<body>
+<header class="site-header">
+  <div class="hd-inner">
+    <p class="brand"><a href="../../">
+      <span class="brand-cap">アライアンス5社をつなぐポータルサイト</span>
+      <span class="brand-row"><svg class="badge" viewBox="0 0 64 40" aria-hidden="true"><ellipse cx="32" cy="20" rx="31" ry="19" fill="var(--green)"/><ellipse cx="32" cy="20" rx="27" ry="15.5" fill="none" stroke="#fff" stroke-width="1.6"/><text x="32" y="26.5" text-anchor="middle" font-size="17" font-weight="800" font-family="Inter,Arial,sans-serif" fill="#fff" font-style="italic">WPT</text></svg><span class="brand-name">ウッドプラスチックテクノロジー</span><span class="brand-sep"></span><span class="brand-portal">PORTAL</span></span>
+    </a></p>
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="gnav"><span></span><span class="sr">メニュー</span></button>
+    <div class="hd-nav" id="gnav">
+      <nav aria-label="メインメニュー"><ul class="gnav"><li><a href="../../alliance/">アライアンス</a></li><li><a href="../../news/" aria-current="page">ニュース</a></li><li><a href="../../contact/">お問い合わせ</a></li></ul></nav>
+      <div class="hd-cta has-drop">
+        <a href="../../recruit/" aria-haspopup="true">採用情報</a>
+        <ul class="drop"><li><a href="../../recruit/jobs/">仕事を知る</a></li><li><a href="../../recruit/people/">人を知る</a></li><li><a href="../../recruit/open/">オープン採用</a></li><li><a href="../../recruit/faq/">よくある質問</a></li><li><a href="../../recruit/career/">募集一覧</a></li><li><a href="../../recruit/entry/">エントリー</a></li></ul>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main class="site-main">
+<section class="page-head page-head--slim"><div class="container"><p class="en">NEWS</p><p class="ph-ja">ニュース</p></div></section>
+
+<section class="sec narrow"><div class="container"><article class="article">
+  <h1 id="ar-title"></h1>
+  <p class="ar-meta" id="ar-meta"></p>
+  <div class="ar-body" id="ar-body"><!-- news.json の lead と blocks --></div>
+</article><nav class="pager" id="ar-pager"></nav></div></section>
+</main>
+
+<footer class="site-footer">
+  <div class="marquee marquee--footer" aria-hidden="true"><div class="marquee-track"><span>WOOD PLASTIC TECHNOLOGY</span><span>WOOD PLASTIC TECHNOLOGY</span></div></div>
+  <div class="container ft-inner">
+    <div class="brand"><a href="../../">
+      <span class="brand-cap">アライアンス5社をつなぐポータルサイト</span>
+      <span class="brand-row"><svg class="badge" viewBox="0 0 64 40" aria-hidden="true"><ellipse cx="32" cy="20" rx="31" ry="19" fill="var(--green)"/><ellipse cx="32" cy="20" rx="27" ry="15.5" fill="none" stroke="#fff" stroke-width="1.6"/><text x="32" y="26.5" text-anchor="middle" font-size="17" font-weight="800" font-family="Inter,Arial,sans-serif" fill="#fff" font-style="italic">WPT</text></svg><span class="brand-name">ウッドプラスチックテクノロジー</span><span class="brand-sep"></span><span class="brand-portal">PORTAL</span></span>
+    </a></div>
+    <ul class="ft-links"><li><a href="../../">ホーム</a></li><li><a href="../../alliance/">アライアンス</a></li><li><a href="../../news/">ニュース</a></li><li><a href="../../contact/">お問い合わせ</a></li></ul>
+    <ul class="ft-links"><li><a href="../../recruit/">採用トップ</a></li><li><a href="../../recruit/jobs/">仕事を知る</a></li><li><a href="../../recruit/people/">人を知る</a></li><li><a href="../../recruit/open/">オープン採用</a></li><li><a href="../../recruit/faq/">よくある質問</a></li><li><a href="../../recruit/career/">募集一覧</a></li><li><a href="../../recruit/entry/">エントリー</a></li></ul>
+    <div class="ft-bottom">
+      <p class="ft-rel"><span>関連サイト</span>
+        <a href="https://www.wpt.co.jp/">ウッドプラスチックテクノロジー</a>
+        <a href="https://grpla.co.jp/">グリーンプラ</a>
+        <a href="https://shikiita.net/">敷板ネット</a></p>
+      <p class="ft-copy">&copy; Wood Plastic Technology Co., Ltd.</p>
+    </div>
+  </div>
+</footer>
+<script>
+  /* ==========================================================================
+     ニュースの記事ページ。全記事でこのHTMLは同じ。
+     フォルダ名（news/20260903/ なら 20260903）と同じ slug の記事を、
+     data/news.json の items から探して表示する。
+
+     新しい記事を足すとき：
+       1. news.json の items に記事を足す（slug にフォルダ名を書く）
+       2. news/ の中の記事フォルダをどれか1つコピーして、フォルダ名を slug と同じにする
+          （中の index.html は書き換えなくてよい）
+     ========================================================================== */
+  (() => {
+    const ROOT = '../../';  // このページからサイトのトップまでの相対パス
+
+    // JSONの文字をHTMLとして安全に埋め込むためのエスケープ。br は改行を <br> にする
+    const esc = s => String(s ?? '').replace(/[&<>"']/g, c => (
+      { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+    ));
+    const br = s => esc(s).replace(/\n/g, '<br>');
+    // JSONの「/」で始まるパス（/assets/… など）を、このページから見たパスに直す
+    const url = p => (String(p ?? '').startsWith('/') ? ROOT + p.slice(1) : p);
+    const img = (src, alt) => `<img src="${esc(url(src))}" alt="${esc(alt)}" loading="lazy">`;
+    // 「確認中」のメモ。文字が空なら隠す
+    const todo = (el, text) => { el.innerHTML = `<span>確認中</span>${esc(text)}`; el.hidden = !text; };
+    const $ = id => document.getElementById(id);
+    const load = name => fetch(`${ROOT}data/${name}`, { cache: 'no-cache' }).then(res => {
+      if (!res.ok) throw new Error(`${name} が読み込めません（${res.status}）`);
+      return res.json();
+    });
+    // ニュースを新しい順に並べる（同じ日付ならフォルダ名の大きい順）
+    const newest = items => [...items].sort((a, b) => (b.d + b.slug).localeCompare(a.d + a.slug));
+    // 会社・カテゴリのコードを、news.json の companies / categories の表示名にする
+    const tags = (codes, names) => codes.map(c => `<span>${esc(names[c] || c)}</span>`).join('');
+
+    // URLの最後のフォルダ名を slug とする
+    const slug = decodeURIComponent(location.pathname.replace(/index\.html$/, '').split('/').filter(Boolean).pop() || '');
+
+    // 本文のブロック。t（種類）ごとにHTMLにする
+    //   p：段落　h：小見出し　link・pdf：リンク（label が表示する文字）
+    //   image：画像（alt が説明）　table：表（[見出し, 内容] の行を並べる）
+    const block = b => {
+      switch (b.t) {
+        case 'p': return `<p>${br(b.v)}</p>`;
+        case 'h': return `<h3>${esc(b.v)}</h3>`;
+        case 'link':
+        case 'pdf': return `<p><a href="${esc(url(b.v))}">${esc(b.label || b.v)}</a></p>`;
+        case 'image': return `<figure>${img(b.v, b.alt)}</figure>`;
+        case 'table': return `<table class="ar-table">${b.v.map(([th, td]) => `<tr><th scope="row">${esc(th)}</th><td>${br(td)}</td></tr>`).join('')}</table>`;
+        default: return '';
+      }
+    };
+
+    load('news.json').then(news => {
+      // 古い順に並べて、前の記事（古い）・次の記事（新しい）を決める
+      const items = newest(news.items).reverse();
+      const i = items.findIndex(n => n.slug === slug);
+      if (i < 0) {
+        $('ar-title').textContent = '記事が見つかりませんでした';
+        $('ar-body').innerHTML = `<p>news.json に「${esc(slug)}」の記事がありません。</p>`;
+        $('ar-pager').innerHTML = `<span class="pg-arrow"></span><a class="pg-list" href="${ROOT}news/">ニュース一覧へ</a><span class="pg-arrow"></span>`;
+        return;
+      }
+      const n = items[i];
+      document.title = `${n.t}｜ウッドプラスチックテクノロジーポータル`;
+      document.querySelector('meta[name="description"]').content = n.lead;
+
+      $('ar-title').textContent = n.t;
+      $('ar-meta').innerHTML = `<time>${esc(n.d)}</time>${tags(n.co, news.companies)}${tags(n.ca, news.categories)}`;
+      $('ar-body').innerHTML = [`<p>${br(n.lead)}</p>`, ...n.blocks.map(block)].join('\n');
+
+      const arrow = (item, label, mark) => item
+        ? `<a class="pg-arrow" href="${ROOT}news/${esc(item.slug)}/" aria-label="${label}">${mark}</a>`
+        : '<span class="pg-arrow"></span>';
+      $('ar-pager').innerHTML = arrow(items[i - 1], '前の記事', '&lsaquo;') +
+        `<a class="pg-list" href="${ROOT}news/">ニュース一覧へ</a>` +
+        arrow(items[i + 1], '次の記事', '&rsaquo;');
+    }).catch(err => console.error(err));
+  })();
+</script>
+<script src="../../assets/app.js?v=20261028" defer></script>
+</body>
+</html>

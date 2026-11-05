@@ -1,0 +1,110 @@
+name: Claude（Issueからの更新）
+
+# Issueやコメントに「@claude」と書かれたときに、Claude が動きます。
+#  - 新しいIssueの本文やタイトルに @claude があるとき
+#  - Issueや公開申請のコメントに @claude があるとき
+# Claude 自身や自動処理（Bot）のコメントには反応しません。
+on:
+  issues:
+    types: [opened]
+  issue_comment:
+    types: [created]
+
+# 同じIssueへの依頼は、前の作業が終わってから順番に処理する
+concurrency:
+  group: claude-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  claude:
+    if: |
+      (github.event_name == 'issues' &&
+        (contains(github.event.issue.body, '@claude') || contains(github.event.issue.title, '@claude'))) ||
+      (github.event_name == 'issue_comment' &&
+        github.event.comment.user.type != 'Bot' &&
+        contains(github.event.comment.body, '@claude'))
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      id-token: write
+      actions: write
+    env:
+      TZ: Asia/Tokyo
+    steps:
+      - name: リポジトリのファイルを取り出す（履歴も含む）
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Pythonを準備する
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: サイト生成・画像処理に必要な部品をインストールする
+        run: pip install -r requirements.txt playwright
+
+      - name: Issueに貼られた画像をダウンロードする
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+        run: |
+          mkdir -p /tmp/github-images
+          python .github/scripts/fetch_issue_images.py
+
+      - name: 作業を始めた時刻を記録する
+        id: start
+        run: echo "time=$(date +%s)" >> "$GITHUB_OUTPUT"
+
+      - name: Claudeが作業する
+        id: claude
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          claude_args: |
+            --allowedTools "Bash(python tools/build.py:*),Bash(python tools/prepare_image.py:*),Bash(python tools/screenshot.py:*),Bash(python tools/render_svg.py:*),Bash(cp:*),Bash(mkdir:*),Bash(ls:*),Bash(git log:*),Bash(git show:*),Bash(git diff:*),Bash(git restore:*),Bash(git tag:*),Bash(git fetch:*)"
+            --add-dir /tmp/issue-images
+            --add-dir /tmp/github-images
+
+      # Claudeが下書きを保存したときだけ、確認用ページの処理（preview.yml）を呼び出す。
+      # Claudeの保存では自動処理が起動しないため、ここから直接呼び出している。
+      - name: 確認用ページの作成を依頼する
+        if: ${{ !cancelled() }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          NUMBER: ${{ github.event.issue.number }}
+          IS_PR: ${{ github.event.issue.pull_request != null }}
+          CLAUDE_BRANCH: ${{ steps.claude.outputs.branch_name }}
+          START: ${{ steps.start.outputs.time }}
+        run: |
+          set -uo pipefail
+          # 調べる下書き：公開申請なら、その公開申請の下書き。Issueなら、このIssueの下書き
+          if [ "$IS_PR" = "true" ]; then
+            CANDIDATES="$(gh pr view "$NUMBER" --repo "$REPO" --json headRefName --jq .headRefName)"
+          else
+            CANDIDATES="${CLAUDE_BRANCH:-} $(git ls-remote --heads origin "claude/issue-${NUMBER}-*" | awk '{print $2}' | sed 's#refs/heads/##' | sort -r)"
+          fi
+
+          # 今回の作業中に保存された下書きを探す（時計のずれを見込んで2分の余裕を持たせる）
+          TARGET=""
+          for BRANCH in $CANDIDATES; do
+            git fetch --quiet origin "$BRANCH" 2>/dev/null || continue
+            SAVED="$(git log -1 --format=%ct FETCH_HEAD)"
+            if [ "$SAVED" -ge "$((START - 120))" ]; then
+              TARGET="$BRANCH"
+              break
+            fi
+          done
+
+          if [ -z "$TARGET" ]; then
+            echo "今回は下書きの保存がなかったため、確認用ページは作りません。"
+            exit 0
+          fi
+          gh workflow run preview.yml --repo "$REPO" --ref "$TARGET"
+          echo "確認用ページの作成を依頼しました（下書き: $TARGET）"

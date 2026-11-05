@@ -1,0 +1,59 @@
+name: 本番サイトに公開
+
+on:
+  # main に反映されたら公開する（＝PRをマージしたとき）
+  push:
+    branches: [ main ]
+  # 毎朝 6:07（日本時間）に作り直して、公開日が来たお知らせを本番に出す
+  schedule:
+    - cron: "7 21 * * *"
+  # Actions タブから手動でも実行できる
+  workflow_dispatch:
+
+concurrency:
+  group: production
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: リポジトリのファイルを取り出す
+        uses: actions/checkout@v4
+
+      - name: Pythonを準備する
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: 必要な部品をインストールする
+        run: pip install -r requirements.txt
+
+      - name: 公開用のファイルをそろえる（チェックも行う）
+        run: python tools/build.py
+
+      - name: 本番フォルダにアップロードする
+        uses: SamKirkland/FTP-Deploy-Action@v4.4.0
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          protocol: ftps
+          port: 21
+          timeout: 120000
+          local-dir: ./dist/
+          server-dir: ./yamaguchi-index.com/public_html/demo_wpt2/
+
+      # 公開した時点の状態に「release-日付-時刻」という目印を付ける。
+      # 差し戻しのときに「○月○日に公開した状態」を探しやすくするため。
+      - name: 公開の記録を残す
+        if: github.event_name == 'push'
+        run: |
+          TAG="release-$(TZ=Asia/Tokyo date +%Y%m%d-%H%M%S)"
+          git tag "$TAG"
+          git push origin "$TAG"
+          echo "公開の記録: $TAG"
