@@ -105,6 +105,9 @@ def main() -> int:
                         if o.get(slug) != n.get(slug) and slug in n:
                             name = n[slug].get("name") or n[slug].get("title") or slug
                             add(f"{PAGE_NAMES[f'recruit/{key}/']}『{name}』", f"recruit/{key}/{slug}/")
+                        elif slug not in n:
+                            name = o[slug].get("name") or o[slug].get("title") or slug
+                            add(f"{PAGE_NAMES[f'recruit/{key}/']}『{name}』（削除）", None)
                 for page in RECRUIT_PAGES.get(key, ["recruit/"]):
                     add(page_label(page), page)
         elif rel in ("data/site.json", "data/products.json"):
@@ -113,7 +116,7 @@ def main() -> int:
 
     for label, page in pages:
         if page is None:
-            print(f"- {label}: 非公開（または掲載終了）のため表示されません。一覧から消えていれば正しい状態です")
+            print(f"- {label}: 削除・非公開などのため表示されません。一覧から消えていれば正しい状態です")
         else:
             print(f"- {label}: {url}{page}")
     return 0

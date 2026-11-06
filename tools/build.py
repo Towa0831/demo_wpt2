@@ -35,6 +35,7 @@ import hashlib
 import json
 import re
 import shutil
+import subprocess
 import sys
 import xml.etree.ElementTree as ET
 from pathlib import Path
@@ -262,7 +263,8 @@ def check_news(news, report: Report, today: dt.date) -> dict[str, int]:
             report.error(label, f"記事のページ site/news/{slug}/index.html がありません。ほかの記事のフォルダの index.html をコピーして作ってください。")
     for folder in sorted((SITE / "news").iterdir()):
         if folder.is_dir() and folder.name not in seen:
-            report.warn(f"site/news/{folder.name}/", "news.json に、このフォルダ名（slug）の記事がありません。")
+            report.error(f"site/news/{folder.name}/", "news.json に、このフォルダ名（slug）の記事がありません。"
+                         f"記事を消したなら、python tools/remove.py news {folder.name} でフォルダも片付けてください。")
     return counts
 
 
@@ -288,7 +290,8 @@ def check_recruit(recruit, site, report: Report) -> None:
         base = SITE / "recruit" / folder
         for d in sorted(base.iterdir()) if base.is_dir() else []:
             if d.is_dir() and d.name not in slugs:
-                report.warn(f"site/recruit/{folder}/{d.name}/", f"recruit.json の {kind} に、このフォルダ名（slug）がありません。")
+                report.error(f"site/recruit/{folder}/{d.name}/", f"recruit.json の {kind} に、このフォルダ名（slug）がありません。"
+                             f"消したなら、python tools/remove.py {kind} {d.name} でフォルダも片付けてください。")
     for person in recruit.get("people", []):
         if isinstance(person, dict) and person.get("jobSlug") and person["jobSlug"] not in jobs:
             report.error(where, f"people「{person.get('slug')}」の jobSlug「{person['jobSlug']}」が jobs にありません。")
@@ -393,7 +396,8 @@ def check_paths_in_json(name: str, data, report: Report) -> None:
         elif not value.startswith("/assets/"):
             page = target if target.suffix else target / "index.html"
             if not page.is_file():
-                report.warn(f"site/data/{name}（{trail}）", f"リンク先「{value}」のページが site/ の中に見つかりません。")
+                report.error(f"site/data/{name}（{trail}）", f"リンク先「{value}」のページが site/ の中に見つかりません"
+                             "（消したページへのリンクなら、外すか別のページに変えるかを担当者に確認してください）。")
 
 
 HTML_REF_RE = re.compile(r'(?:src|href)="([^"]+)"')
@@ -416,6 +420,25 @@ def check_html(report: Report) -> None:
                 report.error(label, f"「{ref}」のファイル（またはページ）が見つかりません。")
 
 
+# 消してよいのは、記事・職種・社員紹介のページのフォルダと、画像・資料だけ（tools/remove.py が消すもの）
+DELETABLE_RE = re.compile(r"^site/(?:news/[^/]+/|recruit/(?:jobs|people)/[^/]+/|assets/(?:img|doc)/)")
+
+
+def check_deleted_files(report: Report) -> None:
+    """main から分かれたあとに消したファイルが、消してよいものだけか（記録が取り出せないときは確かめない）"""
+    def git(*args: str):
+        return subprocess.run(["git", *args], cwd=ROOT, capture_output=True, text=True)
+
+    base = git("merge-base", "origin/main", "HEAD")
+    if base.returncode != 0 or not base.stdout.strip():
+        return
+    out = git("diff", "--name-only", "--diff-filter=D", base.stdout.strip(), "--")
+    for rel in out.stdout.splitlines():
+        if rel and not DELETABLE_RE.match(rel):
+            report.error(rel, "このファイルは消してはいけません。git restore --source=origin/main -- "
+                              f"{rel} で戻してください。")
+
+
 def check_all(today: dt.date) -> tuple[Report, dict]:
     report = Report()
     data = {}
@@ -432,6 +455,7 @@ def check_all(today: dt.date) -> tuple[Report, dict]:
         if value is not None:
             check_paths_in_json(f"{name}.json", value, report)
     check_html(report)
+    check_deleted_files(report)
     for svg in sorted((SITE / "assets").rglob("*.svg")):
         for message in check_svg(svg):
             report.error(str(svg.relative_to(ROOT)), message)
