@@ -143,6 +143,9 @@
       const j = jobOf(rec, p.jobSlug);
       document.title = `${p.name}｜ウッドプラスチックテクノロジーポータル`;
       document.querySelector('meta[name="description"]').content = p.lead;
+      // パンくず（ページ上部の現在地）の最後を、このページの名前にする
+      const here = document.querySelector('.breadcrumb [aria-current="page"]');
+      if (here) here.textContent = p.name;
 
       $('pr-img').innerHTML = photo(p.img, p.name, '人物写真', '');
       $('pr-job').textContent = j.name;

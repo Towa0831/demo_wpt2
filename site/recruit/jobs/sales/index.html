@@ -145,6 +145,9 @@
       }
       document.title = `${j.name}｜ウッドプラスチックテクノロジーポータル`;
       document.querySelector('meta[name="description"]').content = j.lead;
+      // パンくず（ページ上部の現在地）の最後を、このページの名前にする
+      const here = document.querySelector('.breadcrumb [aria-current="page"]');
+      if (here) here.textContent = j.name;
 
       $('job-name').textContent = j.name;
       $('job-lead').textContent = j.lead;
