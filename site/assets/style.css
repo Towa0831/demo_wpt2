@@ -343,7 +343,14 @@ a { color: inherit; }
 .rp-img { overflow: hidden; border-radius: 4px; }
 .rp-img img { width: 100%; height: 500px; aspect-ratio: 4/3; object-fit: cover; border-radius: 10px 0px 0px 10px; }
 .rp-msg { position: relative; max-width: var(--width); margin: 48px auto 24px; padding: 0 80px; font-size: 27px; font-weight: 700; letter-spacing: .08em; }
-.job-cards { position: relative; display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; max-width: var(--width); margin: 0 auto; padding: 0 24px; }
+/* 職種のカード：1段に4枚。1枚を半分の列2つ分で置き、数が4の倍数でないときは最後の段を中央にそろえる */
+.job-cards { position: relative; display: grid; grid-template-columns: repeat(8, 1fr); gap: 14px; max-width: var(--width); margin: 0 auto; padding: 0 24px; }
+.job-cards > li { grid-column: auto / span 2; }
+@media (min-width: 961px) {
+  .job-cards > li:nth-child(4n+1):nth-last-child(3) { grid-column: 2 / span 2; }
+  .job-cards > li:nth-child(4n+1):nth-last-child(2) { grid-column: 3 / span 2; }
+  .job-cards > li:nth-child(4n+1):last-child { grid-column: 4 / span 2; }
+}
 .job-cards a { display: flex; flex-direction: column; height: 100%; background: #fff; color: var(--ink); text-decoration: none; border-radius: 6px; padding: 20px 15px; text-align: center; }
 .job-cards h3 { font-size: 17px; font-weight: 700; }
 .jc-where { color: var(--green); font-size: 13px; }
@@ -399,6 +406,7 @@ a { color: inherit; }
   .rp-en { font-size: 38px; }
   .rp-msg { padding: 0 24px; font-size: 20px; }
   .job-cards { grid-template-columns: 1fr; padding: 0 16px; }
+  .job-cards > li { grid-column: 1 / -1; }
   .jc-lead { text-align: center; }
   .logo-box { padding: 0 10px; }
   .member-logos{ gap: 8px; justify-content: flex-start; }
@@ -700,8 +708,12 @@ details.faq > p { padding: 0 0 18px; font-size: 14px; }
 .big-ja { font-weight: 700; font-size: 13px; margin: 2px 0 14px; }
 .big-head p { font-size: 16px; }
 
-/* 仕事の4枚 */
-.work-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; }
+/* 仕事の一覧：1段に2枚。1枚を半分の列2つ分で置き、数が奇数のときは最後の1枚を中央に置く */
+.work-cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 28px; }
+.work-cards > li { grid-column: auto / span 2; }
+@media (min-width: 961px) {
+  .work-cards > li:nth-child(odd):last-child { grid-column: 2 / span 2; }
+}
 .work-cards a { display: block; position: relative; border-radius: 8px; overflow: hidden; text-decoration: none; }
 .work-cards img, .work-cards .ph { width: 100%; aspect-ratio: 16/10; object-fit: cover; transition: transform .4s; }
 .work-cards a:hover img { transform: scale(1.05); }
@@ -709,8 +721,13 @@ details.faq > p { padding: 0 0 18px; font-size: 14px; }
 .wk-lead { font-weight: 700; margin-top: 12px; }
 .wk-where { font-size: 13px; color: var(--muted); }
 
-/* 社員の一覧 */
-.people-cards { display: grid; grid-template-columns: repeat(3, calc((100% - 60px) / 4)); justify-content: center; gap: 20px; align-items: start; }
+/* 社員の一覧：1段に3人（1人の幅は横幅の4分の1）。1人を半分の列2つ分で置き、最後の段は中央にそろえる */
+.people-cards { display: grid; grid-template-columns: repeat(6, calc(((100% - 60px) / 4 - 20px) / 2)); justify-content: center; gap: 20px; align-items: start; }
+.people-cards > li { grid-column: auto / span 2; }
+@media (min-width: 961px) {
+  .people-cards > li:nth-child(3n+1):nth-last-child(2) { grid-column: 2 / span 2; }
+  .people-cards > li:nth-child(3n+1):last-child { grid-column: 3 / span 2; }
+}
 .people-cards li.is-down { margin-top: 48px; }
 .people-cards a { display: block; text-decoration: none; }
 .pc-img { border-radius: 6px; overflow: hidden; }
@@ -784,7 +801,9 @@ details.faq > p { padding: 0 0 18px; font-size: 14px; }
   .recruit-hero--strip { padding-bottom: 32px; margin-bottom: 0; border-radius: 0 0 40px 40px; }
   .big-head .big-en { font-size: 44px; }
   .work-cards { grid-template-columns: 1fr; }
-  .people-cards { grid-template-columns: 1fr 1fr; gap: 30px 10px; }
+  .work-cards > li { grid-column: 1 / -1; }
+  .people-cards { grid-template-columns: repeat(4, 1fr); gap: 30px 10px; }
+  .people-cards > li:nth-child(odd):last-child { grid-column: 2 / span 2; }
   .people-cards li.is-down { margin-top: 0px; }
   .person-link { grid-template-columns: 120px 1fr; }
   .mosaic { grid-template-columns: 1fr 1fr; grid-template-rows: 200px 140px 140px; }

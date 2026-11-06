@@ -292,6 +292,7 @@ def check_recruit(recruit, site, report: Report) -> None:
     for person in recruit.get("people", []):
         if isinstance(person, dict) and person.get("jobSlug") and person["jobSlug"] not in jobs:
             report.error(where, f"people「{person.get('slug')}」の jobSlug「{person['jobSlug']}」が jobs にありません。")
+    check_job_items(recruit, report)
     company_ids = {c.get("id") for c in (site or {}).get("companies", []) if isinstance(c, dict)}
     for n, opening in enumerate(recruit.get("openings", []), 1):
         if not isinstance(opening, dict):
@@ -303,6 +304,81 @@ def check_recruit(recruit, site, report: Report) -> None:
             report.error(label, f"job の「{opening.get('job')}」は、recruit.json の jobs にありません（使えるもの: {'、'.join(jobs)}）。")
         if opening.get("status", STATUS_PUBLIC) not in STATUSES:
             report.error(label, f"status は「公開」「下書き」「非公開」のどれかにしてください（今は「{opening.get('status')}」）。")
+
+
+def _pairs_ok(value) -> bool:
+    """[["左の列", "右の列"], …] の形か（1日の流れ・キャリアの表）"""
+    return isinstance(value, list) and bool(value) and all(
+        isinstance(row, list) and len(row) == 2 and all(isinstance(c, str) and c.strip() for c in row) for row in value)
+
+
+def check_job_items(recruit: dict, report: Report) -> None:
+    """職種（jobs）と社員紹介（people）の1件ずつに、ページを表示するのに要る項目がそろっているか"""
+    where = "site/data/recruit.json"
+    for job in recruit.get("jobs", []):
+        if not isinstance(job, dict):
+            continue
+        label = f"{where}（jobs「{job.get('slug', '')}」）"
+        for key, name in (("name", "職種名"), ("where", "勤務地"), ("lead", "ひとこと"), ("desc", "仕事内容")):
+            if not (isinstance(job.get(key), str) and job[key].strip()):
+                report.error(label, f"{key}（{name}）を書いてください。")
+        for key, name in (("day", "1日の流れ"), ("career", "キャリアの道筋")):
+            if not _pairs_ok(job.get(key)):
+                report.error(label, f"{key}（{name}）は [[\"左の列\", \"右の列\"], …] の形で1行以上書いてください。")
+        if not job.get("img") and not job.get("imgPlan"):
+            report.warn(label, "写真（img）がありません。撮影予定の枠を出すため、imgPlan（どんな写真を撮る予定か）を書いてください。")
+    for person in recruit.get("people", []):
+        if not isinstance(person, dict):
+            continue
+        label = f"{where}（people「{person.get('slug', '')}」）"
+        for key, name in (("name", "呼び方"), ("jobSlug", "職種"), ("title", "見出し"), ("lead", "ひとこと"), ("where", "勤務地")):
+            if not (isinstance(person.get(key), str) and person[key].strip()):
+                report.error(label, f"{key}（{name}）を書いてください。")
+        qa = person.get("qa")
+        ok = isinstance(qa, list) and bool(qa) and all(
+            isinstance(x, dict) and (
+                (isinstance(x.get("q"), str) and isinstance(x.get("a"), list) and x["a"] and all(isinstance(s, str) for s in x["a"]))
+                or (isinstance(x.get("img"), str) and isinstance(x.get("cap", ""), str)))
+            for x in qa)
+        if not ok:
+            report.error(label, 'qa（インタビュー）は {"q": "質問", "a": ["答えの段落", …]} か {"img": "写真", "cap": "説明"} を並べた形にしてください。')
+
+
+KANJI_NUM = {c: i for i, c in enumerate("〇一二三四五六七八九十")}
+JOB_COUNT_RE = re.compile(r"(?<![0-9０-９〇一二三四五六七八九十])(?P<n>[0-9０-９]+|[一二三四五六七八九十]+)(?:つの)?職種"
+                          r"|職種(?:は|が)(?P<m>[0-9０-９]+|[一二三四五六七八九十]+)つ")
+
+
+def _to_int(text: str) -> int | None:
+    text = text.translate(str.maketrans("０１２３４５６７８９", "0123456789"))
+    if text.isdigit():
+        return int(text)
+    if text == "十":
+        return 10
+    if len(text) == 1 and text in KANJI_NUM:
+        return KANJI_NUM[text]
+    if len(text) == 2 and text[0] == "十" and text[1] in KANJI_NUM:
+        return 10 + KANJI_NUM[text[1]]
+    return None
+
+
+def check_job_count_text(recruit, report: Report) -> None:
+    """「4つの職種」「職種は4つ」のように職種の数を書いた文が、jobs の数と合っているか（職種を増やしたときの直し忘れを防ぐ）"""
+    if not isinstance(recruit, dict):
+        return
+    count = len([j for j in recruit.get("jobs", []) if isinstance(j, dict)])
+    places: list[tuple[str, str]] = []
+    for page in sorted(SITE.rglob("*.html")):
+        places.append((str(page.relative_to(ROOT)), page.read_text(encoding="utf-8")))
+    for name in ("recruit.json", "site.json"):
+        path = DATA / name
+        if path.is_file():
+            places.append((f"site/data/{name}", path.read_text(encoding="utf-8")))
+    for label, text in places:
+        for m in JOB_COUNT_RE.finditer(text):
+            n = _to_int(m.group("n") or m.group("m"))
+            if n is not None and n != count:
+                report.error(label, f"「{m.group(0)}」と書いてありますが、職種（recruit.json の jobs）は {count} つです。文を直してください。")
 
 
 def check_paths_in_json(name: str, data, report: Report) -> None:
@@ -351,6 +427,7 @@ def check_all(today: dt.date) -> tuple[Report, dict]:
         counts = {}
     if data.get("recruit") is not None:
         check_recruit(data["recruit"], data.get("site"), report)
+        check_job_count_text(data["recruit"], report)
     for name, value in data.items():
         if value is not None:
             check_paths_in_json(f"{name}.json", value, report)
