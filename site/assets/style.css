@@ -369,9 +369,7 @@ a { color: inherit; }
 .logo-box img { max-width: 80%; max-height: 48px; }   /* site.json の companies に logo を入れたとき */
 
 @media (max-width: 1440px) {
-  .member-logos li{
-    max-width: 880px;
-  }
+  .member-logos li{ max-width: 880px;}
 }
 
 @media (max-width: 960px) {
@@ -443,7 +441,7 @@ a { color: inherit; }
 .page-head h1 { font-size: 28px; font-weight: 700; margin-top: 4px; }
 .ph-ja { font-size: 14px; font-weight: 500; }
 .page-head--slim h1 { font-size: 14px; }
-.ph-lead { max-width: 800px; margin: 16px auto 0; font-size: 16px; text-align: justify; }
+.ph-lead { max-width: 800px; width: fit-content; margin: 16px auto 0; font-size: 16px; text-align: justify; }
 .ph-img { margin-top: 0; padding-top: 96px; }
 .ph-img img, .ph-img .ph { width: 100%; aspect-ratio: 21/8; object-fit: cover; border-radius: var(--radius) var(--radius); }
 
@@ -470,6 +468,9 @@ details.faq > p { padding: 0 0 18px; font-size: 14px; }
 .form input, .form select, .form textarea { width: 100%; border: 1px solid var(--rule); border-radius: 6px; padding: 12px 14px; background: var(--soft); }
 .form textarea { min-height: 160px; }
 .field-note { font-size: 14px; color: var(--muted); margin-top: 4px; }
+/* お問い合わせ・エントリーのフォーム：幅を 720px までにして中央に置く。フォームのページだけ、下の注意書きも中央にそろえる */
+#mailform { max-width: 720px; margin: 0 auto; }
+.sec.narrow .container:has(#mailform) { text-align: center; }
 
 @media (max-width: 960px) {
   .faq-cat{ font-size: 20px; line-height: 24px; margin-bottom: 10px; }
